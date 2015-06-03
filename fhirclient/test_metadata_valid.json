@@ -7,7 +7,7 @@
         "xml",
         "json"
     ],
-    "identifier": "https://fhir-api.smartplatforms.org/conformance",
+    "identifier": "https://fhir-api.smarthealthit.org/conformance",
     "name": "SMART on FHIR Conformance Statement",
     "publisher": "SMART on FHIR",
     "resourceType": "Conformance",
@@ -26,15 +26,20 @@
             "resource": [],
             "security": {
                 "description": "SMART on FHIR uses OAuth2 for authorization",
-                "http://fhir-registry.smartplatforms.org/Profile/oauth-uris#register": [{
-                    "valueUri": "https://authorize.smartplatforms.org/register"
-                }],
-                "http://fhir-registry.smartplatforms.org/Profile/oauth-uris#authorize": [{
-                    "valueUri": "https://authorize.smartplatforms.org/authorize"
-                }],
-                "http://fhir-registry.smartplatforms.org/Profile/oauth-uris#token": [{
-                    "valueUri": "https://authorize.smartplatforms.org/token"
-                }],
+                "extension": [
+                    {
+                        "url": "http://fhir-registry.smarthealthit.org/Profile/oauth-uris#register",
+                        "valueUri": "https://authorize.smarthealthit.org/register"
+                    },
+                    {
+                        "url": "http://fhir-registry.smarthealthit.org/Profile/oauth-uris#authorize",
+                        "valueUri": "https://authorize.smarthealthit.org/authorize"
+                    },
+                    {
+                        "url": "http://fhir-registry.smarthealthit.org/Profile/oauth-uris#token",
+                        "valueUri": "https://authorize.smarthealthit.org/token"
+                    }
+                ],
                 "service": [
                     {
                         "coding": [
@@ -53,7 +58,7 @@
     "telecom": [
         {
             "system": "url",
-            "value": "https://fhir-api.smartplatforms.org"
+            "value": "https://fhir-api.smarthealthit.org"
         }
     ],
     "text": {
