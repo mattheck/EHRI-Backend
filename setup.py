@@ -36,7 +36,7 @@ setup(
     author="SMART Platforms Team",
     author_email='redacted@example.invalid',
     packages=find_packages(exclude=['test*']),
-    install_requires=['requests'],
+    install_requires=['requests', 'isodate'],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
