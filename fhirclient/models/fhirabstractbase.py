@@ -159,7 +159,7 @@ class FHIRAbstractBase(object):
         
         # loop all registered properties and instantiate
         errs = []
-        valid = set(['resourceType', 'fhir_comments'])
+        valid = set(['resourceType'])   # used to also contain `fhir_comments` until STU-3
         found = set()
         nonoptionals = set()
         for name, jsname, typ, is_list, of_many, not_optional in self.elementProperties():
