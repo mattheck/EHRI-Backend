@@ -141,17 +141,20 @@ class FHIRAbstractResource(fhirabstractbase.FHIRAbstractBase):
             return ret.json()
         return None
     
-    def delete(self):
+    def delete(self, server=None):
         """ Delete the receiver from the given server with a DELETE command.
         
+        :param FHIRServer server: The server to update the receiver on;
+            optional, will use the instance's `server` if needed.
         :returns: None or the response JSON on success
         """
-        if self.server is None:
+        srv = server or self.server
+        if srv is None:
             raise Exception("Cannot delete a resource that does not have a server")
         if not self.id:
             raise Exception("Cannot delete a resource that does not have an id")
         
-        ret = self.server.delete_json(self.relativePath())
+        ret = srv.delete_json(self.relativePath())
         if len(ret.text) > 0:
             return ret.json()
         return None
