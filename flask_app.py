@@ -94,7 +94,8 @@ def index():
         pres = _get_prescriptions(smart)
 
         if pres is not None:
-            prescriptions = ', '.join(_get_med_name(p, smart) for p in pres)
+            prescriptions = ',<br/> '.join(_get_med_name(p, smart)
+                                           for p in pres)
         else:
             prescriptions = "There are no prescriptions for {name}"
 
@@ -115,7 +116,7 @@ def index():
             for item1, item2 in zip(telecom_systems, telecom_values):
                 combined_string = f"<span>{item1.title()}</span> <input value='{item2}'/>"
                 communication_list.append(combined_string)
-            communication = ' '.join(communication_list)
+            communication = '<br/>'.join(communication_list)
         else:
             communication = "No telecom entries available."
         body = ""
