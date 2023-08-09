@@ -99,14 +99,23 @@ def index():
             prescriptions = "There are no prescriptions for {name}"
 
         formatted_telecom_list = []
+        telecom_systems = []
+        telecom_values = []
         for telecom_item in smart.patient.telecom:
             system = telecom_item.system
             value = telecom_item.value
             formatted_telecom = f"{system}: {value}"
             formatted_telecom_list.append(formatted_telecom)
+            telecom_systems.append(system)
+            telecom_values.append(value)
 
         if len(formatted_telecom_list) > 0:
-            communication = ', '.join(formatted_telecom_list)
+            communication_list = []
+
+            for item1, item2 in zip(telecom_systems, telecom_values):
+                combined_string = f"<span>{item1.title()}</span> <input value='{item2}'/>"
+                communication_list.append(combined_string)
+            communication = ' '.join(communication_list)
         else:
             communication = "No telecom entries available."
         body = ""
