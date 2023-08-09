@@ -114,7 +114,7 @@ def index():
             communication_list = []
 
             for item1, item2 in zip(telecom_systems, telecom_values):
-                combined_string = f"<span>{item1.title()}</span> <input value='{item2}'/>"
+                combined_string = f"<span class='mt-1 mb-1'>{item1.title()}</span> <input class='mb-1 mt-1' value='{item2}'/>"
                 communication_list.append(combined_string)
             communication = '<br/>'.join(communication_list)
         else:
@@ -150,7 +150,7 @@ def index():
                             </tr> \
                             <tr>\
                                 <td>📞 Communication: </td>\
-                                <td > {communication} </td >\
+                                <td> {communication} </td >\
                             </tr> \
                         </tbody> \
                     </table> \
