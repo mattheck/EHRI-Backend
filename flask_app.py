@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import json
 from fhirclient import client
 from fhirclient.models.medication import Medication
 from fhirclient.models.medicationrequest import MedicationRequest
@@ -9,15 +10,17 @@ from flask import Flask, request, redirect, session
 
 # app setup
 smart_defaults = {
-    'app_id': 'my_web_app',
-    'api_base': 'https://sb-fhir-stu3.smarthealthit.org/smartstu3/data',
-    'redirect_uri': 'http://localhost:8000/fhir-app/',
+    'app_id': 'ecadd2a7-27f8-4c38-8668-0342b79f7f19',
+    'api_base': 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4/',
+    'redirect_uri': 'http://localhost:8000/fhir-app',
 }
 
 app = Flask(__name__)
 
+
 def _save_state(state):
     session['state'] = state
+
 
 def _get_smart():
     state = session.get('state')
@@ -26,46 +29,56 @@ def _get_smart():
     else:
         return client.FHIRClient(settings=smart_defaults, save_func=_save_state)
 
+
 def _logout():
     if 'state' in session:
         smart = _get_smart()
         smart.reset_patient()
 
+
 def _reset():
     if 'state' in session:
         del session['state']
 
+
 def _get_prescriptions(smart):
-    bundle = MedicationRequest.where({'patient': smart.patient_id}).perform(smart.server)
+    bundle = MedicationRequest.where(
+        {'patient': smart.patient_id}).perform(smart.server)
     pres = [be.resource for be in bundle.entry] if bundle is not None and bundle.entry is not None else None
     if pres is not None and len(pres) > 0:
         return pres
     return None
 
+
 def _get_medication_by_ref(ref, smart):
     med_id = ref.split("/")[1]
     return Medication.read(med_id, smart.server).code
 
+
 def _med_name(med):
     if med.coding:
-        name = next((coding.display for coding in med.coding if coding.system == 'http://www.nlm.nih.gov/research/umls/rxnorm'), None)
+        name = next((coding.display for coding in med.coding if coding.system ==
+                    'http://www.nlm.nih.gov/research/umls/rxnorm'), None)
         if name:
             return name
     if med.text and med.text:
         return med.text
     return "Unnamed Medication(TM)"
 
+
 def _get_med_name(prescription, client=None):
     if prescription.medicationCodeableConcept is not None:
         med = prescription.medicationCodeableConcept
         return _med_name(med)
     elif prescription.medicationReference is not None and client is not None:
-        med = _get_medication_by_ref(prescription.medicationReference.reference, client)
+        med = _get_medication_by_ref(
+            prescription.medicationReference.reference, client)
         return _med_name(med)
     else:
         return 'Error: medication not found'
 
 # views
+
 
 @app.route('/')
 @app.route('/index.html')
@@ -73,30 +86,81 @@ def index():
     """ The app's main page.
     """
     smart = _get_smart()
-    body = "<h1>Hello</h1>"
-    
-    if smart.ready and smart.patient is not None:       # "ready" may be true but the access token may have expired, making smart.patient = None
-        name = smart.human_name(smart.patient.name[0] if smart.patient.name and len(smart.patient.name) > 0 else 'Unknown')
-        
-        # generate simple body text
-        body += "<p>You are authorized and ready to make API requests for <em>{0}</em>.</p>".format(name)
+    # "ready" may be true but the access token may have expired, making smart.patient = None
+    if smart.ready and smart.patient is not None:
+        name = smart.human_name(smart.patient.name[0] if smart.patient.name and len(
+            smart.patient.name) > 0 else 'Unknown')
+
         pres = _get_prescriptions(smart)
+
         if pres is not None:
-            body += "<p>{0} prescriptions: <ul><li>{1}</li></ul></p>".format("His" if 'male' == smart.patient.gender else "Her", '</li><li>'.join([_get_med_name(p,smart) for p in pres]))
+            prescriptions = ', '.join(_get_med_name(p, smart) for p in pres)
         else:
-            body += "<p>(There are no prescriptions for {0})</p>".format("him" if 'male' == smart.patient.gender else "her")
-        body += """<p><a href="/logout">Change patient</a></p>"""
+            prescriptions = "There are no prescriptions for {name}"
+
+        formatted_telecom_list = []
+        for telecom_item in smart.patient.telecom:
+            system = telecom_item.system
+            value = telecom_item.value
+            formatted_telecom = f"{system}: {value}"
+            formatted_telecom_list.append(formatted_telecom)
+
+        if len(formatted_telecom_list) > 0:
+            communication = ', '.join(formatted_telecom_list)
+        else:
+            communication = "No telecom entries available."
+        body = ""
+        body += "<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js\" integrity=\"sha384-cuYeSxntonz0PPNlHhBs68uyIAVpIIOZZ5JqeqvYYIcEL727kskC66kF92t6Xl2V\" crossorigin=\"anonymous\"></script>"
+        body += "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css\" integrity=\"sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65\" crossorigin=\"anonymous\">"
+        body += (f"<div class='container' style='position: relative; top: 50%; left: 50%; transform: translate(-50%, -50%);'> \
+                    <div><h1 class='fs-4'>You are authorized and ready to make API requests for {name}</h1></div>\
+                    <table class =\"table border border-light mt-4 mb-4\" style='max-width: 60 % ; '> \
+                        <thead>\
+                            <tr>\
+                                <th>Patient Name: </th>\
+                                <th>{name}</th>\
+                            </tr>\
+                        </thead>\
+                        <tbody>\
+                            <tr>\
+                                <td>⚥ Gender</td>\
+                                <td>{smart.patient.gender.title()}</td>\
+                            </tr>\
+                            <tr>\
+                                <td>🗓️ Birth Date</td>\
+                                <td>{((smart.patient.birthDate.date.strftime('%d/%m/%Y')))}</td>\
+                            </tr>\
+                            <tr>\
+                                <td>🏘️ Address:</td>\
+                                <td>{smart.patient.address[0].line[0] + ', ' + smart.patient.address[0].city + ', ' + smart.patient.address[0].state}</td>\
+                            </tr>\
+                            <tr>\
+                                <td>💊 Prescriptions: </td>\
+                                <td > {prescriptions} </td >\
+                            </tr> \
+                            <tr>\
+                                <td>📞 Communication: </td>\
+                                <td > {communication} </td >\
+                            </tr> \
+                        </tbody> \
+                    </table> \
+                    <p><a href='/logout'>Change patient</a></p> \
+                 </div> \
+        ")
+
     else:
+        body = ""
         auth_url = smart.authorize_url
         if auth_url is not None:
-            body += """<p>Please <a href="{0}">authorize</a>.</p>""".format(auth_url)
+            body += """<p>Please <a href="{0}">authorize</a>.</p>""".format(
+                auth_url)
         else:
             body += """<p>Running against a no-auth server, nothing to demo here. """
         body += """<p><a href="/reset" style="font-size:small;">Reset</a></p>"""
     return body
 
 
-@app.route('/fhir-app/')
+@ app.route('/fhir-app/')
 def callback():
     """ OAuth2 callback interception.
     """
@@ -108,13 +172,13 @@ def callback():
     return redirect('/')
 
 
-@app.route('/logout')
+@ app.route('/logout')
 def logout():
     _logout()
     return redirect('/')
 
 
-@app.route('/reset')
+@ app.route('/reset')
 def reset():
     _reset()
     return redirect('/')
@@ -124,6 +188,6 @@ def reset():
 if '__main__' == __name__:
     import flaskbeaker
     flaskbeaker.FlaskBeaker.setup_app(app)
-    
+
     logging.basicConfig(level=logging.DEBUG)
     app.run(debug=True, port=8000)
