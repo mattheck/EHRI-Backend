@@ -2,6 +2,8 @@
 
 import logging
 import json
+import requests
+import jwt
 from fhirclient import client
 from fhirclient.models.medication import Medication
 from fhirclient.models.medicationrequest import MedicationRequest
@@ -10,7 +12,7 @@ from flask import Flask, request, redirect, session
 
 # app setup
 smart_defaults = {
-    'app_id': 'ecadd2a7-27f8-4c38-8668-0342b79f7f19',
+    'app_id': '31a0fdc8-3fae-463d-8cfe-2c406d98a820',
     'api_base': 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4/',
     'redirect_uri': 'http://localhost:8000/fhir-app',
 }
@@ -77,6 +79,61 @@ def _get_med_name(prescription, client=None):
     else:
         return 'Error: medication not found'
 
+
+def get_fhir_record():
+    """
+    Retrieve OAuth2.0 token using Client Credentials Grant.
+
+    Args:
+        - client_id (str): Client ID from OAuth2.0 provider.
+        - client_secret (str): Client Secret from OAuth2.0 provider.
+        - token_url (str): OAuth2.0 provider's token endpoint URL.
+        - scope (list or str, optional): Scope(s) for which the application requests access.
+
+    Returns:
+        dict: Contains access token and other details.
+    """ 
+
+    token = ''
+    jwt_assertion = eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1cm46b2lkOmZoaXIiLCJjbGllbnRfaWQiOiIzMWEwZmRjOC0zZmFlLTQ2M2QtOGNmZS0yYzQwNmQ5OGE4MjAiLCJlcGljLmVjaSI6InVybjplcGljOk9wZW4uRXBpYy1jdXJyZW50IiwiZXBpYy5tZXRhZGF0YSI6IlkxTDV3X0xpYlp4MWdRTlIweDItZ1VEb2dWcEdWLVNaTUpLNFBVUG5qWXp6UDhTb2dIdGI5NkpSODBfZFhZcHhUOUVrVVJ4c1l5dVA5SFdObm5oLTNCUVlRYzA0bVZXOTY2VjNjdUJyS2RsVmhMczI0SEpoaVJjcGt5eHk3STNoIiwiZXBpYy50b2tlbnR5cGUiOiJhY2Nlc3MiLCJleHAiOjE2OTIyMDI3MjIsImlhdCI6MTY5MjE5OTEyMiwiaXNzIjoidXJuOm9pZDpmaGlyIiwianRpIjoiYzYxOGIyMGEtYmY5Yy00YTYzLWE1MWUtMzc5MDJlOTNhYmJkIiwibmJmIjoxNjkyMTk5MTIyLCJzdWIiOiJldk5wLUtoWXdPT3FBWm4xcFoyZW51QTMifQ.Ns_vdGvQye5bIyT1qYJRc2DFh5ki0PgezVC_R6DDoHCayYdanH1V0GVA4N_pE6vnvCyCI8AA3t630ub12r-K0JpQBBLJ2G6X-wMqi4HJrbPi5VSAuvtdIsSfsOKaDNAUyExI6LTY9Orpj8cX-xzR56SH7AYO94s8h7sEbWGD79f1-dwh8Rsw84IeHf0nvbeKMFG_mbjlH7hylHiC5KQUs0EkbycI3AgSTO0JhdKpj0JngkS-KbN9o1DXXMlw_eEty8z9qDWXtZ__MeQOADE61olMEwCRJbUOeCWdmXeBTRH2vwwGLvRD-xg5IbUIde4Us0GFew-AnPbcYYb9c0fheQ
+
+    auth_url = "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token"
+    auth_headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    auth_data = {
+        "grant_type": "client_credentials",
+        "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        "client_assertion": jwt_assertion 
+    }
+
+    auth_response = requests.post(auth_url, headers=auth_headers, data=auth_data)
+
+    # Printing the response for debugging
+    print(auth_response.status_code)
+    print(auth_response.text)
+
+    token_response = auth_response.json()
+    print(token_response)
+    if 'access_token' not in token_response:
+        raise ValueError(f"Failed to obtain access token: {token_response.get('error_description')}")
+    else: 
+        token = "Bearer"+token_response.access_token
+
+    fhir_url = "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4/"
+    fhir_headers = {
+        "Authorization": token,
+        "Content-Type": "application/json"
+    }
+    fhir_data = {}
+
+    fhir_response = requests.post(fhir_url, headers=fhir_headers, data=fhir_data)
+
+# Printing the response for debugging
+    print(fhir_response.status_code)
+    print(fhir_response.text)
+
+    return fhir_response
 # views
 
 
@@ -180,6 +237,20 @@ def callback():
     except Exception as e:
         return """<h1>Authorization Error</h1><p>{0}</p><p><a href="/">Start over</a></p>""".format(e)
     return redirect('/')
+
+@app.route('/api', methods=['GET', 'PUT', 'DELETE', 'POST'])
+def _backend_client_route(patientId=1234):
+   if request.method == 'GET':
+        try:
+            return get_fhir_record(patientId)
+        except Exception as e:
+            return "Authorization Error. Please start over.".format(e)
+   elif request.method == "PUT":
+       return 'PUT method not supported.'
+   elif request.method == "DELETE":
+       return 'DELETE method not supported.'
+   elif request.method == "POST":
+       return 'POST method not supported.'
 
 
 @ app.route('/logout')
