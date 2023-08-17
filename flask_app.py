@@ -5,13 +5,16 @@ import datetime
 import jwt
 import uuid
 import requests
-from flask import Flask, request, redirect
+from flask import Flask, request
 
 # Constants
 app_id = '31a0fdc8-3fae-463d-8cfe-2c406d98a820'
 token_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token'
 fhir_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/DSTU2/'
 query = 'Patient/T1wI5bk8n1YVgvWk9D05BmRV0Pi3ECImNSK8DKyKltsMB'
+
+# Timeout constant for requests
+REQUEST_TIMEOUT = 10
 
 app = Flask(__name__)
 
@@ -36,15 +39,21 @@ def get_auth_token(jwt_token):
         "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
         "client_assertion": jwt_token 
     }
-    response = requests.post(token_uri, headers=auth_headers, data=auth_data)
+    logging.debug("Fetching auth token...")
+    response = requests.post(token_uri, headers=auth_headers, data=auth_data, timeout=REQUEST_TIMEOUT)
+    logging.debug("Received auth token response")
     return response.json()
 
 def get_fhir_record(query):
     """Retrieve OAuth2.0 token using Client Credentials Grant."""
+    logging.debug("Reading private key...")
     with open("ehri-backend-private.pem", "r") as f:
         private_key = f.read()
-
+    logging.debug("Generating JWT token...")
+    
     jwt_token = generate_jwt_token(private_key)
+    logging.debug("Fetching authentication token...")
+    
     token_response = get_auth_token(jwt_token)
     
     if 'access_token' not in token_response:
@@ -53,11 +62,13 @@ def get_fhir_record(query):
     token = "Bearer " + token_response['access_token']
     fhir_headers = {
         "Authorization": token,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
-    fhir_data = {}
     combined_uri = fhir_uri + query
-    fhir_response = requests.get(combined_uri, headers=fhir_headers)
+    logging.debug("Fetching FHIR record...")
+    fhir_response = requests.get(combined_uri, headers=fhir_headers, timeout=REQUEST_TIMEOUT)
+    logging.debug(f"Received FHIR record response {fhir_response.text}")
     return fhir_response.text
 
 @app.route('/')
@@ -67,10 +78,15 @@ def index():
 
 @app.route('/api', methods=['GET'])
 def api_route():
+    # Get the 'query' parameter from the URL, default to the constant if not provided
+    print(type(request.args))  # Check the type
+    print(request.args)        # Print the value
+    query_param = request.args.get('query', default=query)
     try:
-        return get_fhir_record(query)
+        return get_fhir_record(query_param)
     except Exception as e:
         return f"Authorization Error: {e}. Please start over."
+
 
 # Commenting out these until they're implemented
 # @app.route('/logout')
