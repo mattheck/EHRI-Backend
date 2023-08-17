@@ -73,7 +73,7 @@ def get_fhir_record():
     if 'access_token' not in token_response:
         raise ValueError(f"Failed to obtain access token: {token_response.get('error_description')}")
     else:
-        token = token_response.access_token
+        token = token_response.get('access_token')
         print(f'access token {token}')
         token = "Bearer "+token
 
@@ -85,8 +85,7 @@ def get_fhir_record():
     fhir_data = {}
 
     fhir_response =  requests.post(fhir_uri, headers=fhir_headers, data=fhir_data)
-
-# Printing the response for debugging
+    # Printing the response for debugging
     print(f'FHIR Response status code {fhir_response.status_code}')
     print(f'FHIR Response text {fhir_response.text}')
 
