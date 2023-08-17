@@ -1,58 +1,33 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import json
 import datetime
 import jwt
 import uuid
 import requests
-from fhirclient import client
-from fhirclient.models.medication import Medication
-from fhirclient.models.medicationrequest import MedicationRequest
+from flask import Flask, request, redirect
 
-from flask import Flask, request, redirect, session
-
+# Constants
 app_id = '31a0fdc8-3fae-463d-8cfe-2c406d98a820'
 token_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token'
-
-# app setup
-smart_defaults = {
-    'app_id': app_id,
-    'api_base': 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4/',
-    'redirect_uri': 'http://localhost:8000/fhir-app',
-}
+fhir_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/DSTU2/'
+query = 'Patient/T1wI5bk8n1YVgvWk9D05BmRV0Pi3ECImNSK8DKyKltsMB'
 
 app = Flask(__name__)
 
-def get_fhir_record():
-    """
-    Retrieve OAuth2.0 token using Client Credentials Grant.
-
-    Args:
-        none
-    Returns:
-        dict: Contains access token and other details.
-    """ 
-
-    token = ''
-    token_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token'
-    fhir_uri = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/DSTU2/'
-
-    with open("ehri-backend-private.pem", "r") as f:
-        private_key = f.read()
-
+def generate_jwt_token(private_key):
+    """Generate JWT token for authentication."""
     payload = {
         "iss": app_id,
         "sub": app_id,
         "aud": token_uri,
         "jti": str(uuid.uuid4()),
-        # Expiry is set by adding a timedelta to the current time
         "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=4)
     }
+    return jwt.encode(payload, private_key, algorithm="RS512")
 
-    jwt_token = jwt.encode(payload, private_key, algorithm="RS512")
-    print("Generated JWT:", jwt_token)
-
+def get_auth_token(jwt_token):
+    """Retrieve the authentication token."""
     auth_headers = {
         "Content-Type": "application/x-www-form-urlencoded"
     }
@@ -61,71 +36,55 @@ def get_fhir_record():
         "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
         "client_assertion": jwt_token 
     }
+    response = requests.post(token_uri, headers=auth_headers, data=auth_data)
+    return response.json()
 
-    auth_response =  requests.post(token_uri, headers=auth_headers, data=auth_data)
+def get_fhir_record(query):
+    """Retrieve OAuth2.0 token using Client Credentials Grant."""
+    with open("ehri-backend-private.pem", "r") as f:
+        private_key = f.read()
 
-    # Printing the response for debugging
-    print(f'Auth Response status code {auth_response.status_code}')
-    print(f'Auth Response text {auth_response.text}')
-
-    token_response = auth_response.json()
+    jwt_token = generate_jwt_token(private_key)
+    token_response = get_auth_token(jwt_token)
     
     if 'access_token' not in token_response:
         raise ValueError(f"Failed to obtain access token: {token_response.get('error_description')}")
-    else:
-        token = token_response.get('access_token')
-        print(f'access token {token}')
-        token = "Bearer "+token
-
-    print(f'token {token}')
+    
+    token = "Bearer " + token_response['access_token']
     fhir_headers = {
         "Authorization": token,
         "Content-Type": "application/json"
     }
     fhir_data = {}
-
-    fhir_response =  requests.post(fhir_uri, headers=fhir_headers, data=fhir_data)
-    # Printing the response for debugging
-    print(f'FHIR Response status code {fhir_response.status_code}')
-    print(f'FHIR Response text {fhir_response.text}')
-
+    combined_uri = fhir_uri + query
+    fhir_response = requests.get(combined_uri, headers=fhir_headers)
     return fhir_response.text
-# views
 
 @app.route('/')
 @app.route('/index.html')
 def index():
     return "Please hit the /api endpoint."
 
-@app.route('/api', methods=['GET', 'PUT', 'DELETE', 'POST'])
-def _backend_client_route(patientId=1234):
-   if request.method == 'GET':
-        try:
-            return get_fhir_record()
-        except Exception as e:
-            return "Authorization Error: {}. Please start over.".format(e)
-   elif request.method == "PUT":
-       return 'PUT method not supported.'
-   elif request.method == "DELETE":
-       return 'DELETE method not supported.'
-   elif request.method == "POST":
-       return 'POST method not supported.'
+@app.route('/api', methods=['GET'])
+def api_route():
+    try:
+        return get_fhir_record(query)
+    except Exception as e:
+        return f"Authorization Error: {e}. Please start over."
 
+# Commenting out these until they're implemented
+# @app.route('/logout')
+# def logout():
+#     _logout()
+#     return redirect('/')
 
-@app.route('/logout')
-def logout():
-    _logout()
-    return redirect('/')
+# @app.route('/reset')
+# def reset():
+#     _reset()
+#     return redirect('/')
 
-
-@app.route('/reset')
-def reset():
-    _reset()
-    return redirect('/')
-
-
-# start the app
-if '__main__' == __name__:
+if __name__ == '__main__':
+    # Assuming you need flaskbeaker for session management or some other purposes
     import flaskbeaker
     flaskbeaker.FlaskBeaker.setup_app(app)
 
