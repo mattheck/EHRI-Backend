@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+from ehri_key import load_private_key
 import datetime
 import jwt
 import uuid
@@ -47,8 +48,7 @@ def get_auth_token(jwt_token):
 def get_fhir_record(query):
     """Retrieve OAuth2.0 token using Client Credentials Grant."""
     logging.debug("Reading private key...")
-    with open("ehri-backend-private.pem", "r") as f:
-        private_key = f.read()
+    private_key = load_private_key()
     logging.debug("Generating JWT token...")
     
     jwt_token = generate_jwt_token(private_key)
