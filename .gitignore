@@ -13,3 +13,10 @@ session_data
 *.sublime-*
 
 .DS_Store
+
+# Deployment-managed signing keys and local secrets
+*.pem
+*.key
+.env
+.env.*
+!.env.example
